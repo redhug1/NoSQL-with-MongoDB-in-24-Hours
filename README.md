@@ -22,3 +22,10 @@ https://www.mongodb.org/dl/linux/x86_64
 
 
 -=-=-
+
+## Additional notes for linux:
+## Page 81
+- Use `nano` to create/edit: `mongod_config_auth.txt` in folder `/usr/local/bin`
+- You should be able to copy the contents of said named file from hour04 folder into nano editor in the container.
+- Use `ps -alt` to see the mongod process number and then use `kill -9 nn` to stop its process
+- To restart the MongoDB Server: `mongod --config mongo_config_auth.txt &`

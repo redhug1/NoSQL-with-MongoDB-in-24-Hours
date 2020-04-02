@@ -6,7 +6,7 @@
 FROM ubuntu:18.04
 
 RUN apt-get update && \
-    apt-get install lsof
+    apt-get install lsof nano
 
 COPY mongodb-linux-x86_64-2.4.8/bin/. /usr/local/bin
 
