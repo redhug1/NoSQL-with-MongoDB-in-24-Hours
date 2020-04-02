@@ -1,7 +1,7 @@
 Docker file setup files and code for book:
 
 ## NoSQL with MongoDB in 24 Hours,
-dated September 2014
+( book printed: September 2014 )
 
 ## This book uses mongo version 2.4.8
 
