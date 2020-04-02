@@ -1,5 +1,5 @@
 #!/bin/bash
-mongod &
+mongod --config /usr/local/bin/mongod_config.txt &
 sleep 7
 echo " "
 echo "Checking mongo service is listening:"

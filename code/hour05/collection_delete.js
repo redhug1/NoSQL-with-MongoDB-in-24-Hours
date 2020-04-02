@@ -1,0 +1,15 @@
+mongo = new Mongo("localhost");
+myDB = mongo.getDB("newDB");
+collections = myDB.getCollectionNames();
+print("Initial Collections:");
+printjson(collections);
+collection = myDB.getCollection("newCollectionA");
+printjson(collection.drop());
+collections = myDB.getCollectionNames();
+print("After deleting newCollectionA:");
+printjson(collections);
+collection = myDB.getCollection("newCollectionB");
+printjson(collection.drop());
+collections = myDB.getCollectionNames();
+print("After deleting newCollectionB:");
+printjson(collections);

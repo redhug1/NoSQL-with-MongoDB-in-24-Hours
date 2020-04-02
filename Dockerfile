@@ -9,6 +9,7 @@ RUN apt-get update && \
     apt-get install lsof nano
 
 COPY mongodb-linux-x86_64-2.4.8/bin/. /usr/local/bin
+COPY code/hour02/mongod_config.txt /usr/local/bin
 
 # Create the default data directory for mongo
 RUN mkdir -p /data/db

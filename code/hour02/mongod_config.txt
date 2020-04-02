@@ -1,0 +1,7 @@
+# verbose = false
+port = 27017
+dbpath = /data/db
+noauth = true
+maxConns = 10
+rest = true
+
