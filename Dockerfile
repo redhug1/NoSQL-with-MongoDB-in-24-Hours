@@ -1,5 +1,12 @@
 # to build this dockerfile: docker build . -t mong:2.4.8
-# then to run: docker run --rm -hostname{mongo_2-4} -it -v $PWD:/studies mong:2.4.8
+# then to run:
+#
+#   docker run --rm -hostname{mongo_2-4} -it -v $PWD:/studies mong:2.4.8
+#
+# OR to retain the database between seperate runs of the container ... use:
+#
+#   docker run --rm -hostname{mongo_2-4} -it -v $PWD:/studies -v /data/db:/data/db mong:2.4.8
+#
 # then use mongo: mongo, etc
 #
 # Start from specific image version of ubuntu
