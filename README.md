@@ -35,3 +35,6 @@ The code in this repo' for `hour05/generate_words.js` has been modified to read 
 To save typing, copy:
 
 `mongo words --eval "db.word_stats.find().count()"`
+
+## Page 121
+Some extra words were added to `google-10000-english.txt` in folder `hour05` to enable the last two find's in `find_specific.js` to show some output.

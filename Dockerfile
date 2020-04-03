@@ -7,6 +7,8 @@
 #
 #   docker run --rm -hostname{mongo_2-4} -it -v $PWD:/studies -v /data/db:/data/db mong:2.4.8
 #
+# The above is in a script named: mongo_start_container.sh (make sure it is executable)
+#
 # then use mongo: mongo, etc
 #
 # Start from specific image version of ubuntu
