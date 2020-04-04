@@ -1,0 +1,18 @@
+mongo = new Mongo("localhost");
+wordsDB = mongo.getDB("words");
+wordsColl = wordsDB.getCollection("word_stats");
+results = wordsColl.distinct('size');
+print("Sizes of words:");
+printjson(results);
+results = wordsColl.distinct('size', {first:'q'});
+print("Sizes of words starting with Q:");
+printjson(results);
+results = wordsColl.distinct('last', {'stats.vowels':0});
+print("Words with no vowels end with letter:");
+printjson(results);
+results = wordsColl.distinct('first', {last:'u'});
+print("Words ending in U start with letter:");
+printjson(results);
+print("Number of consonants in words longer than 10 characters:");
+results = wordsColl.distinct('stats.consonants',{size:{$gt:10}});
+printjson(results);
