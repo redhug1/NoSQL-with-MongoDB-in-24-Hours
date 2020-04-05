@@ -7,4 +7,5 @@ lsof -i -P -n | grep LISTEN
 echo " "
 cd studies/code
 ls
+echo "alias python=python3" >> ~/.bashrc
 bash

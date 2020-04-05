@@ -14,8 +14,15 @@
 # Start from specific image version of ubuntu
 FROM ubuntu:18.04
 
-RUN apt-get update && \
-    apt-get install lsof nano
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y -q dialog apt-utils tasksel
+
+RUN apt-get install lsof nano
+
+# comment out the following 2 lines if you do not need python3 ...
+RUN apt-get install -y python3 python3-pip libsnappy-dev libkrb5-dev
+RUN python3 -m pip install pymongo[snappy,gssapi,srv,tls,zstd]
 
 COPY mongodb-linux-x86_64-2.4.8/bin/. /usr/local/bin
 COPY code/hour02/mongod_config.txt /usr/local/bin
