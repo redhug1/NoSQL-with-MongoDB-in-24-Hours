@@ -4,7 +4,7 @@ def getOne(collection):
     print("Single Document:")
     print(doc)
 def getManyFor(collection):
-    print("\nMany Using While Loop:")
+    print("\nMany Using For Loop:")
     cursor = collection.find()
     words = []
     for doc in cursor:
@@ -13,7 +13,7 @@ def getManyFor(collection):
             break
     print(words)
 def getManySlice(collection):
-    print("\nMany Using For Each Loop:")
+    print("\nMany Using  slice and For Loop:")
     cursor = collection.find()
     cursor = cursor[5:10]
     words = []

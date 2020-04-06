@@ -4,10 +4,11 @@ Docker file setup files and code for book:
 ( book printed: September 2014 )
 
 ## This book uses mongo version 2.4.8
+## Added folders to hours 16 to 18 that contain versions of the similarly named python files in `go`
 
 `NOT` all of the examples in the book will work for later versions of mongo.
 
-See the comments in 'Dockerfile' for creating a Docker image that creates a Ubuntu 18.04 Container with mongo 2.4.8 installed.
+See the comments in 'Dockerfile' for creating a Docker image that creates a Ubuntu 18.04 Container with `mongo 2.4.8` installed + `python 3.6.9` + `go 1.14.1`
 
 See also the instructions in the 'Dockerfile' for starting the Container.
 

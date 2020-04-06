@@ -48,6 +48,7 @@ RUN rm go.tgz
 
 RUN apt-get install -y git
 
+# Install go mongo library that will work with mongo 2.4.8
 RUN go get gopkg.in/mgo.v2
 
 # run commands in running container, to finalise container setup for use
