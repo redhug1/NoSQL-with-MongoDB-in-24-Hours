@@ -9,12 +9,16 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func getOne(collection *mgo.Collection) {
-	var doc bson.M
-	err := collection.Find(bson.M{}).One(&doc)
+func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getOne(collection *mgo.Collection) {
+	var doc bson.M
+	err := collection.Find(bson.M{}).One(&doc)
+	check(err)
 	fmt.Println("\nSingle Document:")
 	fmt.Println(doc)
 }
@@ -33,16 +37,19 @@ func getManyFor(collection *mgo.Collection) {
 			break
 		}
 	}
+	err := iter.Close()
+	check(err)
 }
 
 func getManySlice(collection *mgo.Collection) {
 	fmt.Print("\nMany Using Skip & Limit + Loop:  ")
-	start := time.Now()
-	cursor := collection.Find(bson.M{}).Skip(4).Limit(4)
 	var docs []bson.M
-	if err := cursor.All(&docs); err != nil {
-		log.Fatal(err)
-	}
+	start := time.Now()
+	// set the cursor to skip the first 4, then span the next 4
+	cursor := collection.Find(bson.M{}).Skip(4).Limit(4)
+	// then get up to 4 documents at the cursor
+	err := cursor.All(&docs)
+	check(err)
 	fmt.Printf("Search took %s\n", time.Since(start))
 	var words []string
 	for i := 0; i < 4; i++ {
@@ -56,15 +63,13 @@ func getManySlice(collection *mgo.Collection) {
 			fmt.Println("word error")
 		}
 	}
-	fmt.Println("Words:")
+	fmt.Print("Words: ")
 	fmt.Println(words)
 }
 
 func main() {
 	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
+	check(err)
 	defer session.Close()
 
 	collection := session.DB("words").C("word_stats")
