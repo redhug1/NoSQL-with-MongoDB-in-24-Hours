@@ -12,8 +12,8 @@ def over12(collection):
     cursor = collection.find(query)
     displayCursor(cursor)
 def startingABC(collection):
-    prin("\nWords starting with A, B, C:")
-    query = {'first': {'$in': ["a","b","c"]}},
+    print("\nWords starting with A, B, C:")
+    query = {'first': {'$in': ["a","b","c"]}}
     cursor = collection.find(query)
     displayCursor(cursor)
 def startEndVowels(collection):
@@ -42,6 +42,7 @@ if __name__=="__main__":
     db = mongo['words']
     collection = db['word_stats']
     over12(collection)
+    startingABC(collection)
     startEndVowels(collection)
     over6Vowels(collection)
     nonAlphaCharacters(collection)
