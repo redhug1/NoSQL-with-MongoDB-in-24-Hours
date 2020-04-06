@@ -33,5 +33,22 @@ RUN mkdir -p /data/db
 COPY start.sh .
 RUN chmod +x start.sh
 
+# Configure Go
+ENV GOPATH /go
+ENV PATH /usr/local/go/bin:$PATH
+ENV GOBIN $GOPATH/bin
+
+RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
+
+RUN apt-get install -y wget
+
+RUN wget -O go.tgz https://dl.google.com/go/go1.14.1.linux-amd64.tar.gz 
+RUN tar -C /usr/local -xzf go.tgz
+RUN rm go.tgz
+
+RUN apt-get install -y git
+
+RUN go get gopkg.in/mgo.v2
+
 # run commands in running container, to finalise container setup for use
 CMD ./start.sh
