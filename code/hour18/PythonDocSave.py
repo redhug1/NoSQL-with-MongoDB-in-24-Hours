@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient # this does similar to what is in file: doc_save.js (hour08)
 def showWord(collection):
     query = {'word': 'ocean'}
     fields = {'word': True, 'category': True}

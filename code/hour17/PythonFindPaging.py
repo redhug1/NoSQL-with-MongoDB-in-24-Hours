@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# this does what is done in file: find_paging.js (hour07)
 def displayCursor(cursor):
     words = ''
     for doc in cursor:

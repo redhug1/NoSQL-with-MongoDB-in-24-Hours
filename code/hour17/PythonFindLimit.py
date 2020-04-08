@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# this does similar to whats in file: find_limit.js (hour07)
 def displayCursor(cursor):
     words = ''
     for doc in cursor:

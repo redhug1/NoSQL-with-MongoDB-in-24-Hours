@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient # this does what is done in file: doc_aggregate.js (hour09)
 def displayAggregate(results):
     for result in results['result']:
         print(result)

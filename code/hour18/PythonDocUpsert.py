@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient # this does similar to what is in file: doc_upsert.js (hour08)
 def showWord(collection):
     query = {'word': 'righty'}
     doc = collection.find_one(query)

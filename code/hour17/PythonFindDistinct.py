@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# this does similar to what is in file: find_distinct.js (hour07)
 def sizesOfAllWords(collection):
     results = collection.distinct("size")
     print("\nDistinct Sizes of words: ")

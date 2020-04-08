@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# this does most of what is in file: find_sort.js (hour07)
 def displayCursor(cursor):
     words = ''
     for doc in cursor:

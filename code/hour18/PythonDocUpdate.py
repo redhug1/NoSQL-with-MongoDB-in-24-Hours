@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient # this does similar to what is in file: doc_update.js (hour08)
 def showWord(collection):
     query = {'word': {'$in': ['left', 'lefty']}}
     cursor = collection.find(query)

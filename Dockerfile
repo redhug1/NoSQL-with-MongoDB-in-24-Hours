@@ -13,6 +13,7 @@
 #
 # Start from specific image version of ubuntu
 FROM ubuntu:18.04
+#FROM phusion/baseimage:master  # this sets things up a bit better, see: https://phusion.github.io/baseimage-docker/ & https://hub.docker.com/r/phusion/baseimage/ & https://github.com/phusion/baseimage-docker
 
 ARG DEBIAN_FRONTEND=noninteractive
 

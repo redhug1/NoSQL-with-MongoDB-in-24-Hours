@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# does similar to what is in file find_specific.js (hour06)
 def displayCursor(cursor):
     words = ''
     for doc in cursor:

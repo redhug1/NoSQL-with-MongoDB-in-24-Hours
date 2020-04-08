@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient	# does a little of what is in file: find_count.js (hour07)
 def countWords(collection):
     cursor = collection.find()
     print("Total words in the collection:")

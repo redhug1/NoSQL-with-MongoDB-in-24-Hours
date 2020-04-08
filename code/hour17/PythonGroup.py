@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo import MongoClient # this does same as file: doc_group.js (hour09)
 def displayGroup(results):
     for result in results:
         print(result)
