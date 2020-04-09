@@ -16,7 +16,7 @@ func check(err error) {
 	}
 }
 
-func displayCursor(doc bson.M) {
+func displayDoc(doc bson.M) {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
 	check(err)
@@ -58,7 +58,7 @@ func includeFields(collection *mgo.Collection, fields []string) {
 	check(err)
 
 	fmt.Printf("\nIncluding %v fields:\n", fields)
-	displayCursor(doc)
+	displayDoc(doc)
 }
 
 func excludeFields(collection *mgo.Collection, fields []string) {
@@ -89,7 +89,7 @@ func excludeFields(collection *mgo.Collection, fields []string) {
 	check(err)
 
 	fmt.Printf("\nExcluding %v fields:\n", fields)
-	displayCursor(doc)
+	displayDoc(doc)
 }
 
 func main() {
