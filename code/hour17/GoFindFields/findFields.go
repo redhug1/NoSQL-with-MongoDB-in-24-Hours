@@ -40,7 +40,7 @@ func includeFields(collection *mgo.Collection, fields []string) {
 		// place variable number of 'fields' into JSON style string
 		sel = `{"`
 		for _, field := range fields {
-			sel += field + `": 1,"`
+			sel += field + `": 1,"` // Add 'key' and a value of '1' to include this 'key' in the results
 		}
 		sel = sel[:len(sel)-2] + `}`
 	} else {
@@ -71,7 +71,7 @@ func excludeFields(collection *mgo.Collection, fields []string) {
 		// place variable number of 'fields' into JSON style string
 		sel = `{"`
 		for _, field := range fields {
-			sel += field + `": 0,"`
+			sel += field + `": 0,"` // Add 'key' and a value of '0' to exclude this 'key' from the results
 		}
 		sel = sel[:len(sel)-2] + `}`
 	} else {
@@ -99,7 +99,7 @@ func main() {
 
 	collection := session.DB("words").C("word_stats")
 
-	excludeFields(collection, []string{})
+	excludeFields(collection, []string{}) // show all fields
 	includeFields(collection, []string{"word", "size"})
 	includeFields(collection, []string{"word", "letters"})
 	excludeFields(collection, []string{"letters", "stats", "charsets"})
