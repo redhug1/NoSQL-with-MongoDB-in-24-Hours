@@ -96,7 +96,7 @@ func firstLetterTotals(collection *mgo.Collection) {
 		bson.M{"$sort": bson.M{"_id": 1}},
 	}
 	iter := collection.Pipe(pipeline).Iter()
-	fmt.Printf("\n'Words grouped by first letter with totals:\n")
+	fmt.Printf("\nWords grouped by first letter with totals:\n")
 
 	// the original python code created the 'total' field in this function, but
 	// i can't see how to achieve that with the 'mgo' mongodb go library ...
