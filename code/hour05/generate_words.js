@@ -56,7 +56,9 @@ for (var i=0; i<wordArr.length; i++){
         if (other.length){
             wordObj.otherChars = other;
         }
-        wordObjArr.push(wordObj);
+        if (word.length){
+            wordObjArr.push(wordObj);
+        }
     } catch (e) {
         print(e);
         print(word);
