@@ -70,6 +70,16 @@ func showNewDocs(collection *mgo.Collection) {
 	for iter.Next(&doc) {
 		displayDoc(doc)
 	}
+	fmt.Printf("Showing structure of document for word 'the' written by javascript to check that the ones written by this go program are the same ...\n")
+	fmt.Printf("You need to do a visual check / comparison !\n")
+	query = bson.M{"word": "the"} // NOTE: the case of the letters does matter
+	cursor = collection.Find(query)
+	// Show all the doc's found ...
+	iter = cursor.Iter()
+	for iter.Next(&doc) {
+		displayDoc(doc)
+	}
+
 	findSpecificWords(collection) // added to just show the word of interest
 }
 
@@ -82,7 +92,7 @@ func addSelfie(collection *mgo.Collection) {
 		"last":     "e",
 		"size":     6,
 		"category": "New",
-		"stats":    []bson.M{bson.M{"vowels": 3}, bson.M{"consonants": 3}},
+		"stats":    bson.M{"vowels": 3, "consonants": 3},
 		"letters":  letters,
 		"charsets": []bson.M{
 			bson.M{"type": "consonants", "chars": constChars},
@@ -92,6 +102,48 @@ func addSelfie(collection *mgo.Collection) {
 	err := collection.Insert(selfie)
 	check(err)
 	fmt.Printf("After Inserting One:\n")
+	showNewDocs(collection)
+}
+
+func addGoogleAndTweet(collection *mgo.Collection) {
+	// deliberate mis-spelling as google is already in the 100K list of words
+	var gLetters = []string{"g", "o", "l", "e"}
+	var gConstChars = []string{"g", "l"}
+	var gVowelChars = []string{"o", "e"}
+	gogle := bson.M{
+		"word":     "gogle",
+		"first":    "g",
+		"last":     "e",
+		"size":     6,
+		"category": "New",
+		"stats":    bson.M{"vowels": 2, "consonants": 3},
+		"letters":  gLetters,
+		"charsets": []bson.M{
+			bson.M{"type": "consonants", "chars": gConstChars},
+			bson.M{"type": "vowels", "chars": gVowelChars},
+		}}
+	var tLetters = []string{"t", "w", "e"}
+	var tConstChars = []string{"t", "w"}
+	var tVowelChars = []string{"e"}
+	tweet := bson.M{
+		"word":     "tweet",
+		"first":    "t",
+		"last":     "t",
+		"size":     5,
+		"category": "New",
+		"stats":    bson.M{"vowels": 2, "consonants": 3},
+		"letters":  tLetters,
+		"charsets": []bson.M{
+			bson.M{"type": "consonants", "chars": tConstChars},
+			bson.M{"type": "vowels", "chars": tVowelChars},
+		}}
+	fmt.Printf("About to insert multiple ...\n")
+	// Add multiple documents 'ONE' at a time as 'mgo' lib only does one at a time ...
+	err := collection.Insert(gogle)
+	check(err)
+	err = collection.Insert(tweet)
+	check(err)
+	fmt.Printf("After Inserting Multiple:\n")
 	showNewDocs(collection)
 }
 
@@ -105,5 +157,5 @@ func main() {
 	fmt.Printf("\nBefore Inserting:\n")
 	showNewDocs(collection)
 	addSelfie(collection)
-	//	addGoogleAndTweet(collection)
+	addGoogleAndTweet(collection)
 }
