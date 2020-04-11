@@ -58,7 +58,7 @@ func displayDoc(doc bson.M) {
 }
 
 func findSpecificWords(collection *mgo.Collection) {
-	var abc = []string{"tweet", "gogle", "selfie"}
+	var abc = []string{"tweet", "gogle", "selfie", "jimmmy"}
 	query := bson.M{"word": bson.M{"$in": abc}}
 	cursor := collection.Find(query)
 	displayCursor(cursor)
