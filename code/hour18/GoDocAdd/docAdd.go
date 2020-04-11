@@ -12,7 +12,9 @@ import (
 
 func check(err error) {
 	if err != nil {
+		log.Printf("Go application has failed, here's why:\n")
 		log.Fatal(err)
+		// NOTE: a real application needs to do a lot more with error handling than just stop here
 	}
 }
 
@@ -147,10 +149,52 @@ func addGoogleAndTweet(collection *mgo.Collection) {
 	showNewDocs(collection)
 }
 
+func addJimmmyViaStruct(collection *mgo.Collection) { // thats 3 m's in Jimmmy, to ensure word is not already in the 10K list
+	type StatsType struct {
+		Vowels     float64 `bson:"vowels"`
+		Consonants float64 `bson:"consonants"`
+	}
+	type CharsetsType struct {
+		Type  string   `bson:"type"`
+		Chars []string `bson:"chars"`
+	}
+	type DocStruct struct {
+		Word     string         `bson:"word"`
+		First    string         `bson:"first"`
+		Last     string         `bson:"last"`
+		Size     float64        `bson:"size"`
+		Category string         `bson:"category"`
+		Stats    StatsType      `bson:"stats"`
+		Letters  []string       `bson:"letters"`
+		Charsets []CharsetsType `bson:"charsets"`
+	}
+	jimmmy := DocStruct{}
+	jimmmy.Word = "jimmmy"
+	jimmmy.First = "j"
+	jimmmy.Last = "y"
+	jimmmy.Size = 6
+	jimmmy.Category = "New"
+	jimmmy.Stats.Vowels = 1
+	jimmmy.Stats.Consonants = 5
+	jimmmy.Letters = []string{"j", "i", "m", "y"}
+	jimmmy.Charsets = []CharsetsType{
+		{Type: "consonants", Chars: []string{"j", "m", "y"}},
+		{Type: "vowels", Chars: []string{"i"}},
+	}
+	fmt.Printf("About to insert 'jimmmy' via 'go' structure ...\n")
+	err := collection.Insert(jimmmy)
+	check(err)
+	fmt.Printf("After Inserting 'jimmmy':\n")
+	showNewDocs(collection)
+}
+
 func main() {
 	session, err := mgo.Dial("127.0.0.1")
 	check(err)
-	defer session.Close()
+	defer func() {
+		fmt.Printf("Closing mongodb session\n")
+		session.Close()
+	}()
 
 	collection := session.DB("words").C("word_stats")
 
@@ -158,4 +202,5 @@ func main() {
 	showNewDocs(collection)
 	addSelfie(collection)
 	addGoogleAndTweet(collection)
+	addJimmmyViaStruct(collection)
 }
