@@ -33,7 +33,7 @@ def updateUpsert(collection):
     results = collection.update(query, update, upsert= True, multi=False)
     print("\nUpsert as update results: ")
     print(results)
-    print("After Upser as update:")
+    print("After Upsert as update:")
     showWord(collection)
 if __name__=="__main__":
     mongo = MongoClient('mongodb://localhost:27017')
