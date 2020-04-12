@@ -31,7 +31,7 @@ https://www.mongodb.org/dl/linux/x86_64
 - Use `ps -alt` to see the mongod process number and then use `kill -9 nn` to stop its process
 - To restart the MongoDB Server: `mongod --config mongo_config_auth.txt &`
 ## Page 102
-The code in this repo' for `hour05/generate_words.js` has been modified to read in 10,000 words from a file to create the words collection.
+NOTE: The code in this repo' for `hour05/generate_words.js` has been modified to read in 10,000 words from a file to create the words collection.
 
 To save typing, copy:
 
