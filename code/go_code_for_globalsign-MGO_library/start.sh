@@ -9,7 +9,7 @@ echo " "
 echo "Checking mongo version:"
 mongo --version
 echo " "
-echo "'studies' folder contains:"
+echo "'studies' folder (for go_code_for_globalsign-MGO_library) contains:"
 echo " "
 cd studies
 ls
