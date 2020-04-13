@@ -9,10 +9,6 @@ import (
 	"github.com/globalsign/mgo/bson"
 )
 
-type Client struct {
-	session *mgo.Session
-}
-
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
