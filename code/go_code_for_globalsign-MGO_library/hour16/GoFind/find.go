@@ -19,7 +19,7 @@ func check(err error) {
 	}
 }
 
-func (m *mongo) getOne() {
+func (m *Mongo) getOne() {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -32,7 +32,7 @@ func (m *mongo) getOne() {
 	fmt.Println(doc)
 }
 
-func (m *mongo) getManyFor() {
+func (m *Mongo) getManyFor() {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -54,7 +54,7 @@ func (m *mongo) getManyFor() {
 	check(err)
 }
 
-func (m *mongo) getManySlice() {
+func (m *Mongo) getManySlice() {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -95,25 +95,28 @@ func main() {
 	mongodb.getManySlice()
 }
 
+// The following code is suitable for putting in its own file ...
+// (if i had placed this file in the github path)
+
 const (
 	mongoURI string = "127.0.0.1"
 )
 
-type mongo struct {
+type Mongo struct {
 	Collection string
 	Database   string
 	Session    *mgo.Session
 	URI        string
 }
 
-func GetMongoDB() (*mongo, error) {
-	mongodb := &mongo{
+func GetMongoDB() (*Mongo, error) {
+	mongodb := &Mongo{
 		Collection: "word_stats",
 		Database:   "words",
 		URI:        mongoURI,
 	}
 
-	session, err := mongodb.Init()
+	session, err := mongodb.init()
 	if err != nil {
 		log.Printf("failed to initialise mongo %v", err)
 		return nil, err
@@ -123,7 +126,7 @@ func GetMongoDB() (*mongo, error) {
 	return mongodb, nil
 }
 
-func (m *mongo) Init() (session *mgo.Session, err error) {
+func (m *Mongo) init() (session *mgo.Session, err error) {
 	if session, err = mgo.Dial(m.URI); err != nil {
 		return nil, err
 	}
