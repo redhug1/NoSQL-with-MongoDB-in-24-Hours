@@ -8,19 +8,62 @@ import (
 	"github.com/globalsign/mgo/bson"
 )
 
-func main() {
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-
-	collection := session.DB("words").C("word_stats")
-
-	count, err := collection.Find(bson.M{}).Count()
+func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func main() {
+	mongodb, err := GetMongoDB()
+	check(err)
+	defer mongodb.Session.Close()
+
+	collection := mongodb.Session.DB(mongodb.Database).C(mongodb.Collection)
+
+	count, err := collection.Find(bson.M{}).Count()
+	check(err)
 
 	fmt.Println("Number of Documents:", count)
+}
+
+// The following code is suitable for putting in its own file ...
+// (if i had placed this file in the github path)
+
+const (
+	mongoURI string = "127.0.0.1"
+)
+
+type Mongo struct {
+	Collection string
+	Database   string
+	Session    *mgo.Session
+	URI        string
+}
+
+func GetMongoDB() (*Mongo, error) {
+	mongodb := &Mongo{
+		Collection: "word_stats",
+		Database:   "words",
+		URI:        mongoURI,
+	}
+
+	session, err := mongodb.init()
+	if err != nil {
+		log.Printf("failed to initialise mongo %v", err)
+		return nil, err
+	}
+	mongodb.Session = session
+
+	return mongodb, nil
+}
+
+func (m *Mongo) init() (session *mgo.Session, err error) {
+	if session, err = mgo.Dial(m.URI); err != nil {
+		return nil, err
+	}
+
+	//	session.EnsureSafe(&mgo.Safe{WMode: "majority"})
+	//	session.SetMode(mgo.Strong, true)
+	return session, nil
 }
