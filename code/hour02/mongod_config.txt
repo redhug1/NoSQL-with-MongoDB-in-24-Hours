@@ -1,6 +1,6 @@
 # verbose = false
 port = 27017
-dbpath = /data/db
+dbpath = /data/db24
 noauth = true
 maxConns = 10
 rest = true
