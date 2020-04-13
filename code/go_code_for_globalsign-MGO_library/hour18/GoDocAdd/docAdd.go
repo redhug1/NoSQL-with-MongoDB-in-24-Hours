@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	mgo "gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	mgo "github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 )
 
 func check(err error) {
@@ -85,7 +85,15 @@ func showNewDocs(collection *mgo.Collection) {
 	findSpecificWords(collection) // added to just show the word of interest
 }
 
-func addSelfie(collection *mgo.Collection) {
+func (m *Mongo) addSelfie() {
+	s := m.Session.Copy()
+	defer s.Close()
+
+	collection := s.DB(m.Database).C(m.Collection)
+
+	fmt.Printf("\nBefore Inserting:\n")
+	showNewDocs(collection)
+
 	var letters = []string{"s", "e", "l", "f", "i"}
 	var constChars = []string{"s", "l", "f"}
 	var vowelChars = []string{"e", "i"}
@@ -107,7 +115,12 @@ func addSelfie(collection *mgo.Collection) {
 	showNewDocs(collection)
 }
 
-func addGoogleAndTweet(collection *mgo.Collection) {
+func (m *Mongo) addGoogleAndTweet() {
+	s := m.Session.Copy()
+	defer s.Close()
+
+	collection := s.DB(m.Database).C(m.Collection)
+
 	// deliberate mis-spelling as google is already in the 100K list of words
 	var gLetters = []string{"g", "o", "l", "e"}
 	var gConstChars = []string{"g", "l"}
@@ -149,7 +162,12 @@ func addGoogleAndTweet(collection *mgo.Collection) {
 	showNewDocs(collection)
 }
 
-func addJimmmyViaStruct(collection *mgo.Collection) { // thats 3 m's in Jimmmy, to ensure word is not already in the 10K list
+func (m *Mongo) addJimmmyViaStruct() { // thats 3 m's in Jimmmy, to ensure word is not already in the 10K list
+	s := m.Session.Copy()
+	defer s.Close()
+
+	collection := s.DB(m.Database).C(m.Collection)
+
 	type StatsType struct {
 		Vowels     float64 `bson:"vowels"`
 		Consonants float64 `bson:"consonants"`
@@ -189,18 +207,52 @@ func addJimmmyViaStruct(collection *mgo.Collection) { // thats 3 m's in Jimmmy, 
 }
 
 func main() {
-	session, err := mgo.Dial("127.0.0.1")
+	mongodb, err := GetMongoDB()
 	check(err)
-	defer func() {
-		fmt.Printf("Closing mongodb session\n")
-		session.Close()
-	}()
+	defer mongodb.Session.Close()
 
-	collection := session.DB("words").C("word_stats")
+	mongodb.addSelfie()
+	mongodb.addGoogleAndTweet()
+	mongodb.addJimmmyViaStruct()
+}
 
-	fmt.Printf("\nBefore Inserting:\n")
-	showNewDocs(collection)
-	addSelfie(collection)
-	addGoogleAndTweet(collection)
-	addJimmmyViaStruct(collection)
+// The following code is suitable for putting in its own file ...
+// (if i had placed this file in the github path)
+
+const (
+	mongoURI string = "127.0.0.1"
+)
+
+type Mongo struct {
+	Collection string
+	Database   string
+	Session    *mgo.Session
+	URI        string
+}
+
+func GetMongoDB() (*Mongo, error) {
+	mongodb := &Mongo{
+		Collection: "word_stats",
+		Database:   "words",
+		URI:        mongoURI,
+	}
+
+	session, err := mongodb.init()
+	if err != nil {
+		log.Printf("failed to initialise mongo %v", err)
+		return nil, err
+	}
+	mongodb.Session = session
+
+	return mongodb, nil
+}
+
+func (m *Mongo) init() (session *mgo.Session, err error) {
+	if session, err = mgo.Dial(m.URI); err != nil {
+		return nil, err
+	}
+
+	//	session.EnsureSafe(&mgo.Safe{WMode: "majority"})
+	//	session.SetMode(mgo.Strong, true)
+	return session, nil
 }
