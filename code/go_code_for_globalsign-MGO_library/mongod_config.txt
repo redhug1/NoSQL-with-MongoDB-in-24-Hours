@@ -1,7 +1,7 @@
 # mongodb.conf
 
 # Where to store the data.
-dbpath = /data/db2
+dbpath = /data/db36
 
 #where to log
 logpath=/var/log/mongodb/mongodb.log
@@ -101,7 +101,7 @@ journal=true
 
 verbose = true
 #port = 27017
-#dbpath=/home/rhys/data/db2/
+#dbpath=/home/rhys/data/db36/
 noauth = true
 maxConns = 10
 #rest = true	# no longer available in mongo 3.6

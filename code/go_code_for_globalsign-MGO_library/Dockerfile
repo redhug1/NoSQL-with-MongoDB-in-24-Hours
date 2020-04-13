@@ -5,7 +5,7 @@
 #
 # OR to retain the database between seperate runs of the container ... use:
 #
-#   docker run --rm -hostname{mongo_3-6} -it -v $PWD:/studies -v /data/db2:/data/db2 mong:3.6.17
+#   docker run --rm -hostname{mongo_3-6} -it -v $PWD:/studies -v /data/db36:/data/36 mong:3.6.17
 #
 # The above is in a script named: mongo_start_container.sh (make sure it is executable)
 #
@@ -28,7 +28,7 @@ COPY mongodb-linux-x86_64-ubuntu1404-3.6.17/bin/. /usr/local/bin
 
 # Create the default data directory for mongo
 # NOTE: this is a different folder, as mongo 2.4.8 database files are not compatible with mongo 3.6.17
-RUN mkdir -p /data/db2
+RUN mkdir -p /data/db36
 
 # Configure Go
 ENV GOPATH /go
@@ -53,6 +53,8 @@ RUN mkdir /var/log/mongodb
 
 COPY start.sh .
 RUN chmod +x start.sh
+
+EXPOSE 27017
 
 # run commands in running container, to finalise container setup for use
 CMD ./start.sh
