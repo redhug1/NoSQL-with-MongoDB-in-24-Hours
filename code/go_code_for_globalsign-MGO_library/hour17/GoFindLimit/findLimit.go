@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ func check(err error) {
 	}
 }
 
-func displayCursor(cursor *mgo.Query) {
+func displayCursor(cursor *mgo.Query) error {
 	var doc bson.M
 	var words string
 	iter := cursor.Iter()
@@ -32,14 +33,17 @@ func displayCursor(cursor *mgo.Query) {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	if err != nil {
+		return err
+	}
 	if len(words) > 65 {
 		words = words[:65] + "..."
 	}
 	fmt.Println(words)
+	return nil
 }
 
-func (m *Mongo) limitResults(limit int) {
+func (m *Mongo) limitResults(limit int) error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -48,7 +52,7 @@ func (m *Mongo) limitResults(limit int) {
 	query := bson.M{"first": "p"}
 	cursor := collection.Find(query).Limit(limit)
 	fmt.Printf("\nP words Limited to %v :\n", limit)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
 func main() {
@@ -56,10 +60,28 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.limitResults(1)
-	mongodb.limitResults(3)
-	mongodb.limitResults(5)
-	mongodb.limitResults(7)
+	err = mongodb.limitResults(1)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.limitResults(3)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.limitResults(5)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.limitResults(7)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -89,6 +111,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
