@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -22,7 +23,10 @@ func main() {
 	collection := mongodb.Session.DB(mongodb.Database).C(mongodb.Collection)
 
 	count, err := collection.Find(bson.M{}).Count()
-	check(err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	fmt.Println("Number of Documents:", count)
 }
@@ -54,6 +58,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
