@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ func check(err error) {
 	}
 }
 
-func (m *Mongo) sizesOfAllWords() {
+func (m *Mongo) sizesOfAllWords() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -22,11 +23,14 @@ func (m *Mongo) sizesOfAllWords() {
 
 	var result []int
 	err := collection.Find(nil).Distinct("size", &result)
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nDistinct Sizes of words: %v\n", result)
+	return nil
 }
 
-func (m *Mongo) sizesOfQWords() {
+func (m *Mongo) sizesOfQWords() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -36,11 +40,14 @@ func (m *Mongo) sizesOfQWords() {
 	query := bson.M{"first": "q"}
 	cursor := collection.Find(query)
 	err := cursor.Distinct("size", &result)
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nDistinct Sizes of words starting with Q: %v\n", result)
+	return nil
 }
 
-func (m *Mongo) firstLetterOfLongWords() {
+func (m *Mongo) firstLetterOfLongWords() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -50,8 +57,11 @@ func (m *Mongo) firstLetterOfLongWords() {
 	query := bson.M{"size": bson.M{"$gt": 12}}
 	cursor := collection.Find(query)
 	err := cursor.Distinct("first", &result)
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nDistinct first letters of words longer than 12 characters: %v\n", result)
+	return nil
 }
 
 func main() {
@@ -59,9 +69,22 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.sizesOfAllWords()
-	mongodb.sizesOfQWords()
-	mongodb.firstLetterOfLongWords()
+	err = mongodb.sizesOfAllWords()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.sizesOfQWords()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.firstLetterOfLongWords()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -91,6 +114,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
