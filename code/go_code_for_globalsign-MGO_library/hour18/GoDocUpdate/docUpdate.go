@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -12,45 +13,63 @@ import (
 
 func check(err error) {
 	if err != nil {
-		log.Printf("Go application has failed, here's why:\n")
 		log.Fatal(err)
-		// NOTE: a real application needs to do a lot more with error handling than just stop here
 	}
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		fmt.Println("1")
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		fmt.Println("2")
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func showWord(collection *mgo.Collection) {
+func showWord(collection *mgo.Collection) error {
 	var doc bson.M
 	var words = []string{"left", "lefty"}
 	query := bson.M{"word": bson.M{"$in": words}}
 	cursor := collection.Find(query)
 	iter := cursor.Iter()
 	for iter.Next(&doc) {
-		displayDoc(doc)
+		err := displayDoc(doc)
+		if err != nil {
+			fmt.Println("3")
+
+			iter.Close()
+			return err
+		}
 	}
+	err := iter.Close()
+	return err
 }
 
-func (m *Mongo) updateDoc() {
+func (m *Mongo) updateDoc() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
 	collection := s.DB(m.Database).C(m.Collection)
 
 	fmt.Printf("\nBefore Updating:\n")
-	showWord(collection)
+	err := showWord(collection)
+	if err != nil {
+		fmt.Println("4")
+
+		return err
+	}
 
 	query := bson.M{"word": "left"}
 	update := bson.M{
@@ -58,13 +77,17 @@ func (m *Mongo) updateDoc() {
 		"$inc":  bson.M{"size": 1, "stats.consonants": 1},
 		"$push": bson.M{"letters": "y"},
 	}
-	err := collection.Update(query, update)
-	check(err)
+	err = collection.Update(query, update)
+	if err != nil {
+		fmt.Println("5")
+
+		return err
+	}
 	print("\nAfter Updating Doc:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
-func (m *Mongo) resetDoc() {
+func (m *Mongo) resetDoc() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -74,12 +97,16 @@ func (m *Mongo) resetDoc() {
 	update := bson.M{
 		"$set": bson.M{"word": "left"},
 		"$inc": bson.M{"size": -1, "stats.consonants": -1},
-		"$pop": bson.M{"letters": "y"},
+		"$pop": bson.M{"letters": 1},
 	}
 	err := collection.Update(query, update)
-	check(err)
+	if err != nil {
+		fmt.Println("6")
+
+		return err
+	}
 	fmt.Printf("\nAfter Resetting Doc:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
 func main() {
@@ -87,8 +114,15 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.updateDoc()
-	mongodb.resetDoc()
+	err = mongodb.updateDoc()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	err = mongodb.resetDoc()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -118,6 +152,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
