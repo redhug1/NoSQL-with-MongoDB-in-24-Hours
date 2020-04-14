@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,19 +15,24 @@ func check(err error) {
 	}
 }
 
-func (m *Mongo) countWords() {
+func (m *Mongo) countWords() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
 	collection := s.DB(m.Database).C(m.Collection)
 
 	count, err := collection.Find(bson.M{}).Count()
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nTotal words in the collection: %d\n", count)
 	query := bson.M{"first": "a"}
 	count, err = collection.Find(query).Count()
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nTotal words starting with A: %d\n", count)
+	return nil
 }
 
 func main() {
@@ -34,7 +40,10 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.countWords()
+	err = mongodb.countWords()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -64,6 +73,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
