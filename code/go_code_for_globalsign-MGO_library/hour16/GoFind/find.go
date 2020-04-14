@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -15,7 +16,7 @@ func check(err error) {
 	}
 }
 
-func (m *Mongo) getOne() {
+func (m *Mongo) getOne() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -23,12 +24,15 @@ func (m *Mongo) getOne() {
 
 	var doc bson.M
 	err := collection.Find(bson.M{}).One(&doc)
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nSingle Document:")
 	fmt.Println(doc)
+	return nil
 }
 
-func (m *Mongo) getManyFor() {
+func (m *Mongo) getManyFor() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -47,10 +51,10 @@ func (m *Mongo) getManyFor() {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	return err
 }
 
-func (m *Mongo) getManySlice() {
+func (m *Mongo) getManySlice() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -63,7 +67,10 @@ func (m *Mongo) getManySlice() {
 	cursor := collection.Find(bson.M{}).Skip(4).Limit(4)
 	// then get up to 4 documents at the cursor
 	err := cursor.All(&docs)
-	check(err)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("Search took %s\n", time.Since(start))
 	var words []string
 	for i := 0; i < 4; i++ {
@@ -79,6 +86,7 @@ func (m *Mongo) getManySlice() {
 	}
 	fmt.Print("Words: ")
 	fmt.Println(words)
+	return nil
 }
 
 func main() {
@@ -86,9 +94,22 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.getOne()
-	mongodb.getManyFor()
-	mongodb.getManySlice()
+	err = mongodb.getOne()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.getManyFor()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.getManySlice()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -118,6 +139,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
