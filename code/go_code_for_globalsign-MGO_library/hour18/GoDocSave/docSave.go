@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -12,27 +13,30 @@ import (
 
 func check(err error) {
 	if err != nil {
-		log.Printf("Go application has failed, here's why:\n")
 		log.Fatal(err)
-		// NOTE: a real application needs to do a lot more with error handling than just stop here
 	}
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func includeFieldsForWord(collection *mgo.Collection, word string, fields []string) {
+func includeFieldsForWord(collection *mgo.Collection, word string, fields []string) error {
 	var doc bson.M
 
 	var fieldObj bson.M
@@ -52,40 +56,49 @@ func includeFieldsForWord(collection *mgo.Collection, word string, fields []stri
 
 	// convert variable length JSON search string into format required by mongodb
 	err := bson.UnmarshalJSON([]byte(sel), &fieldObj)
-	check(err)
+	if err != nil {
+		return err
+	}
 	//fmt.Printf("bson %v\n", fieldObj)
 
 	query := bson.M{"word": word}
 	err = collection.Find(query).Select(fieldObj).One(&doc)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("\nIncluding %v fields:\n", fields)
-	displayDoc(doc)
+	return displayDoc(doc)
 }
 
-func showWord(collection *mgo.Collection) {
-	includeFieldsForWord(collection, "the", []string{"word", "the", "category"})
+func showWord(collection *mgo.Collection) error {
+	return includeFieldsForWord(collection, "the", []string{"word", "the", "category"})
 }
 
-func (m *Mongo) saveBlueDoc() {
+func (m *Mongo) saveBlueDoc() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
 	collection := s.DB(m.Database).C(m.Collection)
 
 	fmt.Printf("Before Saving:")
-	showWord(collection)
+	err := showWord(collection)
+	if err != nil {
+		return err
+	}
 	query := bson.M{"word": "the"}
 	update := bson.M{
 		"$set": bson.M{"category": "blue"}, // 'Add' new field
 	}
-	err := collection.Update(query, update) // NOTE: the equivalent to the python 'save' is to do an 'update'
-	check(err)
+	err = collection.Update(query, update) // NOTE: the equivalent to the python 'save' is to do an 'update'
+	if err != nil {
+		return err
+	}
 	print("\nAfter Saving Doc:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
-func (m *Mongo) resetDoc() {
+func (m *Mongo) resetDoc() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -96,9 +109,11 @@ func (m *Mongo) resetDoc() {
 		"$unset": bson.M{"category": nil}, // 'Remove' new field
 	}
 	err := collection.Update(query, update) // NOTE: the equivalent to the python 'save' is to do an 'update'
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nAfter Resetting Doc:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
 func main() {
@@ -106,8 +121,16 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.saveBlueDoc()
-	mongodb.resetDoc()
+	err = mongodb.saveBlueDoc()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.resetDoc()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -137,6 +160,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
