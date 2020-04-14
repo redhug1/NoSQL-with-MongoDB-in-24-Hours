@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ func check(err error) {
 	}
 }
 
-func displayCursor(cursor *mgo.Query) {
+func displayCursor(cursor *mgo.Query) error {
 	var doc bson.M
 	var words string
 	iter := cursor.Iter()
@@ -32,30 +33,45 @@ func displayCursor(cursor *mgo.Query) {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	if err != nil {
+		return err
+	}
 	if len(words) > 65 {
 		words = words[:65] + "..."
 	}
 	fmt.Println(words)
+	return nil
 }
 
-func (m *Mongo) pageResults(skip int) {
+func (m *Mongo) pageResults(skip int) error {
 	s := m.Session.Copy()
 	defer s.Close()
 
 	collection := s.DB(m.Database).C(m.Collection)
 
 	query := bson.M{"first": "y"}
-	cursor := collection.Find(query).Limit(10).Skip(skip)
-	res_count, err := cursor.Count()
-	check(err)
-	if res_count > 0 {
-		fmt.Printf("\nPage %v to %v :\n", skip+1, skip+res_count)
-		displayCursor(cursor)
-		if res_count == 10 {
-			pageResults(collection, skip+10) // recurse
+
+	var loop bool = true
+	for loop {
+		cursor := collection.Find(query).Limit(10).Skip(skip)
+		res_count, err := cursor.Count()
+		if err != nil {
+			return err
+		}
+		loop = false
+		if res_count > 0 {
+			fmt.Printf("\nPage %v to %v :\n", skip+1, skip+res_count)
+			err = displayCursor(cursor)
+			if err != nil {
+				return err
+			}
+			if res_count == 10 {
+				loop = true
+				skip += 10
+			}
 		}
 	}
+	return nil
 }
 
 func main() {
@@ -63,7 +79,10 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.pageResults(0)
+	err = mongodb.pageResults(0)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -93,6 +112,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
