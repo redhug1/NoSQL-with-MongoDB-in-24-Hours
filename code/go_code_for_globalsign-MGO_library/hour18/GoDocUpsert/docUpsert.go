@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -18,31 +19,36 @@ func check(err error) {
 	}
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func showWord(collection *mgo.Collection) {
+func showWord(collection *mgo.Collection) error {
 	var doc bson.M
 	query := bson.M{"word": "righty"}
 	err := collection.Find(query).One(&doc)
 	if err != nil {
 		log.Println(err) // continue on as the word being searched for will not initially be in the list ...
 	}
-	displayDoc(doc)
+	return displayDoc(doc)
 }
 
-func (m *Mongo) addUpsert() {
+func (m *Mongo) addUpsert() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -68,13 +74,15 @@ func (m *Mongo) addUpsert() {
 			bson.M{"type": "vowels", "chars": rVowelChars},
 		}}
 	err := collection.Insert(righty)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	print("\nAfter Upsert as insert:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
-func (m *Mongo) updateUpsert() {
+func (m *Mongo) updateUpsert() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -100,16 +108,18 @@ func (m *Mongo) updateUpsert() {
 			}},
 	}
 	changeInfo, err := collection.Upsert(query, update)
-	check(err)
+	if err != nil {
+		return err
+	}
 	if changeInfo != nil {
 		fmt.Printf("Removed: %d, Updated: %d, Matched: %d, Upserted ID: %v\n", changeInfo.Removed, changeInfo.Updated, changeInfo.Matched, changeInfo.UpsertedId)
 	}
 
 	print("\nAfter Upsert as update:\n")
-	showWord(collection)
+	return showWord(collection)
 }
 
-func (m *Mongo) removeRighty() {
+func (m *Mongo) removeRighty() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -118,10 +128,13 @@ func (m *Mongo) removeRighty() {
 	fmt.Printf("Removing 'righty' ...\n")
 	query := bson.M{"word": "righty"} // NOTE: the case of the letters does matter
 	changeInfo, err := collection.RemoveAll(query)
-	check(err)
+	if err != nil {
+		return err
+	}
 	if changeInfo != nil {
 		fmt.Printf("Removed: %d, Updated: %d, Matched: %d, Upserted ID: %v\n", changeInfo.Removed, changeInfo.Updated, changeInfo.Matched, changeInfo.UpsertedId)
 	}
+	return nil
 }
 
 func main() {
@@ -132,10 +145,22 @@ func main() {
 		mongodb.Session.Close()
 	}()
 
-	mongodb.addUpsert()
-	mongodb.updateUpsert()
+	err = mongodb.addUpsert()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
-	mongodb.removeRighty()
+	err = mongodb.updateUpsert()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.removeRighty()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -165,6 +190,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
