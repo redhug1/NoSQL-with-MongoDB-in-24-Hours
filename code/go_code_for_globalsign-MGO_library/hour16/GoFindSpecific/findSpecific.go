@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ func check(err error) {
 	}
 }
 
-func displayCursor(cursor *mgo.Query) {
+func displayCursor(cursor *mgo.Query) error {
 	var doc bson.M
 	var words string
 	iter := cursor.Iter()
@@ -32,14 +33,18 @@ func displayCursor(cursor *mgo.Query) {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	if err != nil {
+		return err
+	}
+
 	if len(words) > 65 {
 		words = words[:65] + "..."
 	}
 	fmt.Println(words)
+	return nil
 }
 
-func (m *Mongo) over12() {
+func (m *Mongo) over12() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -47,10 +52,10 @@ func (m *Mongo) over12() {
 
 	fmt.Printf("\n\nWords with more than 12 characters:\n")
 	cursor := collection.Find(bson.M{"size": bson.M{"$gt": 12}})
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) startingABC() {
+func (m *Mongo) startingABC() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -60,10 +65,10 @@ func (m *Mongo) startingABC() {
 	var abc = []string{"a", "b", "c"}
 	query := bson.M{"first": bson.M{"$in": abc}}
 	cursor := collection.Find(query)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) startEndVowels() {
+func (m *Mongo) startEndVowels() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -76,10 +81,10 @@ func (m *Mongo) startEndVowels() {
 		bson.M{"last": bson.M{"$in": vowels}},
 	}}
 	cursor := collection.Find(query)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) over6Vowels() {
+func (m *Mongo) over6Vowels() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -88,10 +93,10 @@ func (m *Mongo) over6Vowels() {
 	fmt.Printf("\nWords with more than 5 vowels:\n")
 	query := bson.M{"stats.vowels": bson.M{"$gt": 5}}
 	cursor := collection.Find(query)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) nonAlphaCharacters() {
+func (m *Mongo) nonAlphaCharacters() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -102,7 +107,7 @@ func (m *Mongo) nonAlphaCharacters() {
 		bson.M{"type": "other"},
 		bson.M{"chars": bson.M{"$size": 1}}}}}}
 	cursor := collection.Find(query)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
 func main() {
@@ -110,11 +115,34 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.over12()
-	mongodb.startingABC()
-	mongodb.startEndVowels()
-	mongodb.over6Vowels()
-	mongodb.nonAlphaCharacters()
+	err = mongodb.over12()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.startingABC()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.startEndVowels()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.over6Vowels()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.nonAlphaCharacters()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -144,6 +172,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
