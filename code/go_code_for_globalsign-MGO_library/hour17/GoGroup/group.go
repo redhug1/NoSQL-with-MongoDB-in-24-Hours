@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -16,46 +17,55 @@ func check(err error) {
 	}
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func displayGroup(iter *mgo.Iter) {
+func displayGroup(iter *mgo.Iter) error {
 	var doc bson.M
 	for iter.Next(&doc) {
 		fmt.Println("Document is:")
-		displayDoc(doc)
+		err := displayDoc(doc)
+		if err != nil {
+			iter.Close()
+			return err
+		}
 	}
 	err := iter.Close()
-	check(err)
+	return err
 }
 
-func updateTotalAndDisplay(iter *mgo.Iter) {
+func updateTotalAndDisplay(iter *mgo.Iter) error {
 	var doc bson.M
-
-	defer func() {
-		if err := iter.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	for iter.Next(&doc) {
 		jsonString, err := json.MarshalIndent(doc, "", " ")
-		check(err)
+		if err != nil {
+			iter.Close()
+			return err
+		}
 
 		var fields map[string]interface{}
 		err = json.Unmarshal([]byte(jsonString), &fields)
-		check(err)
+		if err != nil {
+			iter.Close()
+			return err
+		}
 		fmt.Printf("Before adding 'total', fields: %v\n", fields)
 
 		vowelCount := fields["vowels"].(float64)
@@ -63,11 +73,17 @@ func updateTotalAndDisplay(iter *mgo.Iter) {
 		total := vowelCount + consonantCount
 		fields["total"] = total
 
-		displayDoc(bson.M(fields))
+		err = displayDoc(bson.M(fields))
+		if err != nil {
+			iter.Close()
+			return err
+		}
 	}
+	err := iter.Close()
+	return err
 }
 
-func (m *Mongo) firstIsALastIsVowel() {
+func (m *Mongo) firstIsALastIsVowel() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -87,10 +103,10 @@ func (m *Mongo) firstIsALastIsVowel() {
 	}
 	iter := collection.Pipe(pipeline).Iter()
 	fmt.Printf("\n'A' words grouped by first and last letter that ends with a vowel:\n")
-	displayGroup(iter)
+	return displayGroup(iter)
 }
 
-func (m *Mongo) firstLetterTotals() {
+func (m *Mongo) firstLetterTotals() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -112,7 +128,7 @@ func (m *Mongo) firstLetterTotals() {
 	// i can't see how to achieve that with the 'mgo' mongodb go library ...
 	// So, the following function call digs into each document and achieves
 	// the desired result in a programatic manner.
-	updateTotalAndDisplay(iter)
+	return updateTotalAndDisplay(iter)
 }
 
 func main() {
@@ -121,7 +137,15 @@ func main() {
 	defer mongodb.Session.Close()
 
 	mongodb.firstIsALastIsVowel()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	mongodb.firstLetterTotals()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -151,6 +175,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
