@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ func check(err error) {
 	}
 }
 
-func displayCursor(cursor *mgo.Query) {
+func displayCursor(cursor *mgo.Query) error {
 	var doc bson.M
 	var words string
 	iter := cursor.Iter()
@@ -32,14 +33,17 @@ func displayCursor(cursor *mgo.Query) {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	if err != nil {
+		return err
+	}
 	if len(words) > 65 {
 		words = words[:65] + "..."
 	}
 	fmt.Println(words)
+	return nil
 }
 
-func (m *Mongo) sortWordsAscending() {
+func (m *Mongo) sortWordsAscending() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -49,10 +53,10 @@ func (m *Mongo) sortWordsAscending() {
 	cursor := collection.Find(query)
 	cursor.Sort("word")
 	fmt.Printf("\nW words ordered ascending: ")
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) sortWordsDescending() {
+func (m *Mongo) sortWordsDescending() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -62,10 +66,10 @@ func (m *Mongo) sortWordsDescending() {
 	cursor := collection.Find(query)
 	cursor.Sort("-word")
 	fmt.Printf("\nW words ordered descending: ")
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func (m *Mongo) sortWordsAscAndSize() {
+func (m *Mongo) sortWordsAscAndSize() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -75,7 +79,7 @@ func (m *Mongo) sortWordsAscAndSize() {
 	cursor := collection.Find(query)
 	cursor.Sort("last", "-size")
 	fmt.Printf("\nQ words ordered first by last letter and then by size: ")
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
 func main() {
@@ -83,9 +87,22 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.sortWordsAscending()
-	mongodb.sortWordsDescending()
-	mongodb.sortWordsAscAndSize()
+	err = mongodb.sortWordsAscending()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.sortWordsDescending()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.sortWordsAscAndSize()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -115,6 +132,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
