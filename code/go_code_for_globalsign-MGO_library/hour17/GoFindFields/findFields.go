@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -16,21 +17,26 @@ func check(err error) {
 	}
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func (m *Mongo) includeFields(fields []string) {
+func (m *Mongo) includeFields(fields []string) error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -55,18 +61,22 @@ func (m *Mongo) includeFields(fields []string) {
 
 	// convert variable length JSON search string into format required by mongodb
 	err := bson.UnmarshalJSON([]byte(sel), &fieldObj)
-	check(err)
+	if err != nil {
+		return err
+	}
 	//fmt.Printf("bson %v\n", fieldObj)
 
 	query := bson.M{"first": "p"}
 	err = collection.Find(query).Select(fieldObj).One(&doc)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("\nIncluding %v fields:\n", fields)
-	displayDoc(doc)
+	return displayDoc(doc)
 }
 
-func (m *Mongo) excludeFields(fields []string) {
+func (m *Mongo) excludeFields(fields []string) error {
 	s := m.Session.Copy()
 	defer s.Close()
 
@@ -91,15 +101,19 @@ func (m *Mongo) excludeFields(fields []string) {
 
 	// convert variable length JSON search string into format required by mongodb
 	err := bson.UnmarshalJSON([]byte(sel), &fieldObj)
-	check(err)
+	if err != nil {
+		return err
+	}
 	//fmt.Printf("bson %v\n", fieldObj)
 
 	query := bson.M{"first": "p"}
 	err = collection.Find(query).Select(fieldObj).One(&doc)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("\nExcluding %v fields:\n", fields)
-	displayDoc(doc)
+	return displayDoc(doc)
 }
 
 func main() {
@@ -107,10 +121,28 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.excludeFields([]string{}) // show all fields
-	mongodb.includeFields([]string{"word", "size"})
-	mongodb.includeFields([]string{"word", "letters"})
-	mongodb.excludeFields([]string{"letters", "stats", "charsets"})
+	err = mongodb.excludeFields([]string{}) // show all fields
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.includeFields([]string{"word", "size"})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.includeFields([]string{"word", "letters"})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = mongodb.excludeFields([]string{"letters", "stats", "charsets"})
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -140,6 +172,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
