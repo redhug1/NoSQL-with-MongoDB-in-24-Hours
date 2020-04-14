@@ -21,7 +21,6 @@ func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
 	if err != nil {
-		fmt.Println("1")
 		return err
 	}
 	fmt.Println("\nResult as JSON:")
@@ -29,7 +28,6 @@ func displayDoc(doc bson.M) error {
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
 	if err != nil {
-		fmt.Println("2")
 		return err
 	}
 
@@ -47,8 +45,6 @@ func showWord(collection *mgo.Collection) error {
 	for iter.Next(&doc) {
 		err := displayDoc(doc)
 		if err != nil {
-			fmt.Println("3")
-
 			iter.Close()
 			return err
 		}
@@ -66,8 +62,6 @@ func (m *Mongo) updateDoc() error {
 	fmt.Printf("\nBefore Updating:\n")
 	err := showWord(collection)
 	if err != nil {
-		fmt.Println("4")
-
 		return err
 	}
 
@@ -79,8 +73,6 @@ func (m *Mongo) updateDoc() error {
 	}
 	err = collection.Update(query, update)
 	if err != nil {
-		fmt.Println("5")
-
 		return err
 	}
 	print("\nAfter Updating Doc:\n")
@@ -101,8 +93,6 @@ func (m *Mongo) resetDoc() error {
 	}
 	err := collection.Update(query, update)
 	if err != nil {
-		fmt.Println("6")
-
 		return err
 	}
 	fmt.Printf("\nAfter Resetting Doc:\n")
