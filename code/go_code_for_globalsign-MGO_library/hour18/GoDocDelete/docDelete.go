@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
@@ -12,13 +13,11 @@ import (
 
 func check(err error) {
 	if err != nil {
-		log.Printf("Go application has failed, here's why:\n")
 		log.Fatal(err)
-		// NOTE: a real application needs to do a lot more with error handling than just stop here
 	}
 }
 
-func displayCursor(cursor *mgo.Query) {
+func displayCursor(cursor *mgo.Query) error {
 	var doc bson.M
 	var words string
 	iter := cursor.Iter()
@@ -36,41 +35,57 @@ func displayCursor(cursor *mgo.Query) {
 		}
 	}
 	err := iter.Close()
-	check(err)
+	if err != nil {
+		return err
+	}
 	if len(words) > 65 {
 		words = words[:65] + "..."
 	}
 	fmt.Println(words)
+	return nil
 }
 
-func displayDoc(doc bson.M) {
+func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	var st string = out.String()
 	fmt.Printf("%v\n", st)
+	return nil
 }
 
-func findSpecificWords(collection *mgo.Collection) {
+func findSpecificWords(collection *mgo.Collection) error {
 	var abc = []string{"tweet", "gogle", "selfie", "jimmmy"}
 	query := bson.M{"word": bson.M{"$in": abc}}
 	cursor := collection.Find(query)
-	displayCursor(cursor)
+	return displayCursor(cursor)
 }
 
-func showNewDocs(collection *mgo.Collection) {
+func showNewDocs(collection *mgo.Collection) error {
 	var doc bson.M
 	query := bson.M{"category": "New"} // NOTE: the case of the letters does matter
 	cursor := collection.Find(query)
 	iter := cursor.Iter()
 	for iter.Next(&doc) {
-		displayDoc(doc)
+		err := displayDoc(doc)
+		if err != nil {
+			iter.Close()
+			return err
+		}
+	}
+	err := iter.Close()
+	if err != nil {
+		return err
 	}
 	fmt.Printf("Showing structure of document for word 'the' written by javascript to check that the ones written by this go program are the same ...\n")
 	fmt.Printf("You need to do a visual check / comparison !\n")
@@ -79,29 +94,42 @@ func showNewDocs(collection *mgo.Collection) {
 	// Show all the doc's found ...
 	iter = cursor.Iter()
 	for iter.Next(&doc) {
-		displayDoc(doc)
+		err := displayDoc(doc)
+		if err != nil {
+			iter.Close()
+			return err
+		}
+	}
+	err = iter.Close()
+	if err != nil {
+		return err
 	}
 
-	findSpecificWords(collection) // added to just show the word of interest
+	return findSpecificWords(collection) // added to just show the word of interest
 }
 
-func (m *Mongo) removeNewDocs() {
+func (m *Mongo) removeNewDocs() error {
 	s := m.Session.Copy()
 	defer s.Close()
 
 	collection := s.DB(m.Database).C(m.Collection)
 
 	fmt.Printf("\n\nBefore Deleting:\n")
-	showNewDocs(collection)
+	err := showNewDocs(collection)
+	if err != nil {
+		return err
+	}
 
 	query := bson.M{"category": "New"} // NOTE: the case of the letters does matter
 	changeInfo, err := collection.RemoveAll(query)
 	if changeInfo != nil {
 		fmt.Printf("Removed: %d, Updated: %d \n", changeInfo.Removed, changeInfo.Updated)
 	}
-	check(err)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("\nAfter Deleting:\n")
-	showNewDocs(collection)
+	return showNewDocs(collection)
 }
 
 func main() {
@@ -109,7 +137,10 @@ func main() {
 	check(err)
 	defer mongodb.Session.Close()
 
-	mongodb.removeNewDocs()
+	err = mongodb.removeNewDocs()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // The following code is suitable for putting in its own file ...
@@ -139,6 +170,25 @@ func GetMongoDB() (*Mongo, error) {
 		return nil, err
 	}
 	mongodb.Session = session
+
+	names, err := session.DB(mongodb.Database).CollectionNames()
+	if err != nil {
+		log.Printf("Failed to get collection names: %v", err)
+		return nil, err
+	}
+
+	// look for required 'collection name' in slice ...
+	var found bool = false
+	for _, name := range names {
+		if name == mongodb.Collection {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
+		return nil, errors.New("Collection missing")
+	}
 
 	return mongodb, nil
 }
