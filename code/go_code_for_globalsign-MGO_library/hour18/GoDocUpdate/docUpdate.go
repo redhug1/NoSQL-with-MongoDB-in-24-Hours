@@ -144,7 +144,6 @@ func GetMongoDB() (*Mongo, error) {
 		URI:        mongoURI,
 	}
 
-	fmt.Printf("initial Session %v", mongodb.Session)
 	session, err := mongodb.init()
 	if err != nil {
 		// no session to close
@@ -157,7 +156,7 @@ func GetMongoDB() (*Mongo, error) {
 	if err != nil {
 		session.Close()
 		log.Printf("Failed to get collection names: %v", err)
-		return mongodb, err
+		return nil, err
 	}
 
 	// look for required 'collection name' in slice ...
@@ -171,7 +170,7 @@ func GetMongoDB() (*Mongo, error) {
 	if found == false {
 		session.Close()
 		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
-		return mongodb, errors.New("Collection missing")
+		return nil, errors.New("Collection missing")
 	}
 
 	return mongodb, nil
