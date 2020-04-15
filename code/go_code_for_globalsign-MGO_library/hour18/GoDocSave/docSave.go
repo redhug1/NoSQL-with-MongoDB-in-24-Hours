@@ -3,32 +3,35 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
+	"os"
 
 	mgo "github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+
+	"github.com/pkg/errors"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+func init() {
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
 func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	var st string = out.String()
@@ -57,14 +60,14 @@ func includeFieldsForWord(collection *mgo.Collection, word string, fields []stri
 	// convert variable length JSON search string into format required by mongodb
 	err := bson.UnmarshalJSON([]byte(sel), &fieldObj)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	//fmt.Printf("bson %v\n", fieldObj)
 
 	query := bson.M{"word": word}
 	err = collection.Find(query).Select(fieldObj).One(&doc)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	fmt.Printf("\nIncluding %v fields:\n", fields)
@@ -84,7 +87,7 @@ func (m *Mongo) saveBlueDoc() error {
 	fmt.Printf("Before Saving:")
 	err := showWord(collection)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	query := bson.M{"word": "the"}
 	update := bson.M{
@@ -92,7 +95,7 @@ func (m *Mongo) saveBlueDoc() error {
 	}
 	err = collection.Update(query, update) // NOTE: the equivalent to the python 'save' is to do an 'update'
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	print("\nAfter Saving Doc:\n")
 	return showWord(collection)
@@ -110,7 +113,7 @@ func (m *Mongo) resetDoc() error {
 	}
 	err := collection.Update(query, update) // NOTE: the equivalent to the python 'save' is to do an 'update'
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("\nAfter Resetting Doc:\n")
 	return showWord(collection)
@@ -118,18 +121,23 @@ func (m *Mongo) resetDoc() error {
 
 func main() {
 	mongodb, err := GetMongoDB()
-	check(err)
+	if err != nil {
+		errString := fmt.Sprintf("%v", err)
+		log.Fatal().Err(errors.New(errString)).Str("", "").Msgf("Database problem")
+		// log.Fatal() above exits the program
+	}
+
 	defer mongodb.Session.Close()
 
 	err = mongodb.saveBlueDoc()
 	if err != nil {
-		log.Println(err)
-		return
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
+		return // do this so that 'defer' gets done
 	}
 
 	err = mongodb.resetDoc()
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
 	}
 }
 
@@ -156,6 +164,7 @@ func GetMongoDB() (*Mongo, error) {
 
 	session, err := mongodb.init()
 	if err != nil {
+		// no session to close
 		log.Printf("failed to initialise mongo %v", err)
 		return nil, err
 	}
@@ -163,6 +172,7 @@ func GetMongoDB() (*Mongo, error) {
 
 	names, err := session.DB(mongodb.Database).CollectionNames()
 	if err != nil {
+		session.Close()
 		log.Printf("Failed to get collection names: %v", err)
 		return nil, err
 	}
@@ -176,6 +186,7 @@ func GetMongoDB() (*Mongo, error) {
 		}
 	}
 	if found == false {
+		session.Close()
 		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
 		return nil, errors.New("Collection missing")
 	}
