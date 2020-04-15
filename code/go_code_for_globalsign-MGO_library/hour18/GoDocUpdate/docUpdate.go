@@ -107,7 +107,7 @@ func main() {
 	if err != nil {
 		errString := fmt.Sprintf("%v", err)
 		log.Fatal().Err(errors.New(errString)).Str("", "").Msgf("Database problem")
-		return
+		// log.Fatal() above exits the program
 	}
 
 	defer mongodb.Session.Close()
