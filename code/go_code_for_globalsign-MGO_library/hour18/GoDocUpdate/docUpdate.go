@@ -114,12 +114,12 @@ func main() {
 
 	err = mongodb.updateDoc()
 	if err != nil {
-		fmt.Printf("%+v\n", err)
-		return
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
+		return // do this so that 'defer' gets done
 	}
 	err = mongodb.resetDoc()
 	if err != nil {
-		fmt.Printf("%+v\n", err)
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
 	}
 }
 
