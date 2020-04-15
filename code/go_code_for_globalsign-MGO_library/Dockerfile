@@ -50,6 +50,7 @@ RUN apt-get install -y git
 # Install go mongo library that will work with mongo 3.6.17
 RUN go get github.com/globalsign/mgo
 RUN go get github.com/pkg/errors
+RUN go get -u github.com/rs/zerolog/log
 
 COPY mongod_config.txt /usr/local/bin
 RUN mkdir /var/log/mongodb

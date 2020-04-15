@@ -4,18 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"os"
 
 	mgo "github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 
 	"github.com/pkg/errors"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+func init() {
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
 func displayDoc(doc bson.M) error {
@@ -102,7 +104,12 @@ func (m *Mongo) resetDoc() error {
 
 func main() {
 	mongodb, err := GetMongoDB()
-	check(err)
+	if err != nil {
+		errString := fmt.Sprintf("%v", err)
+		log.Fatal().Err(errors.New(errString)).Str("", "").Msgf("Database problem")
+		return
+	}
+
 	defer mongodb.Session.Close()
 
 	err = mongodb.updateDoc()
@@ -137,8 +144,10 @@ func GetMongoDB() (*Mongo, error) {
 		URI:        mongoURI,
 	}
 
+	fmt.Printf("initial Session %v", mongodb.Session)
 	session, err := mongodb.init()
 	if err != nil {
+		// no session to close
 		log.Printf("failed to initialise mongo %v", err)
 		return nil, err
 	}
@@ -146,8 +155,9 @@ func GetMongoDB() (*Mongo, error) {
 
 	names, err := session.DB(mongodb.Database).CollectionNames()
 	if err != nil {
+		session.Close()
 		log.Printf("Failed to get collection names: %v", err)
-		return nil, err
+		return mongodb, err
 	}
 
 	// look for required 'collection name' in slice ...
@@ -159,8 +169,9 @@ func GetMongoDB() (*Mongo, error) {
 		}
 	}
 	if found == false {
+		session.Close()
 		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
-		return nil, errors.New("Collection missing")
+		return mongodb, errors.New("Collection missing")
 	}
 
 	return mongodb, nil
