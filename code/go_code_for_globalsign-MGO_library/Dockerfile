@@ -14,6 +14,8 @@
 # Start from specific image version of ubuntu
 FROM ubuntu:18.04
 
+#ENV http_proxy=http://172.17.0.1:3128 https_proxy=http://172.17.0.1:3128 ftp_proxy=http://172.17.0.1:3128
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y -q dialog apt-utils tasksel
@@ -47,6 +49,7 @@ RUN apt-get install -y git
 
 # Install go mongo library that will work with mongo 3.6.17
 RUN go get github.com/globalsign/mgo
+RUN go get github.com/pkg/errors
 
 COPY mongod_config.txt /usr/local/bin
 RUN mkdir /var/log/mongodb

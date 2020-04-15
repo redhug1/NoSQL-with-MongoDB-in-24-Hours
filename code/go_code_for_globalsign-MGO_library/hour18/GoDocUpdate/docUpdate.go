@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 
 	mgo "github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+
+	"github.com/pkg/errors"
 )
 
 func check(err error) {
@@ -21,14 +22,14 @@ func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	var st string = out.String()
@@ -46,7 +47,7 @@ func showWord(collection *mgo.Collection) error {
 		err := displayDoc(doc)
 		if err != nil {
 			iter.Close()
-			return err
+			return errors.Wrap(err, "")
 		}
 	}
 	err := iter.Close()
@@ -62,7 +63,7 @@ func (m *Mongo) updateDoc() error {
 	fmt.Printf("\nBefore Updating:\n")
 	err := showWord(collection)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	query := bson.M{"word": "left"}
@@ -73,7 +74,7 @@ func (m *Mongo) updateDoc() error {
 	}
 	err = collection.Update(query, update)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	print("\nAfter Updating Doc:\n")
 	return showWord(collection)
@@ -93,7 +94,7 @@ func (m *Mongo) resetDoc() error {
 	}
 	err := collection.Update(query, update)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("\nAfter Resetting Doc:\n")
 	return showWord(collection)
@@ -106,12 +107,12 @@ func main() {
 
 	err = mongodb.updateDoc()
 	if err != nil {
-		log.Println(err)
+		fmt.Printf("%+v\n", err)
 		return
 	}
 	err = mongodb.resetDoc()
 	if err != nil {
-		log.Println(err)
+		fmt.Printf("%+v\n", err)
 	}
 }
 
