@@ -3,18 +3,21 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
+	"os"
 
 	mgo "github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+
+	"github.com/pkg/errors"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+func init() {
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
 func displayCursor(cursor *mgo.Query) error {
@@ -36,7 +39,7 @@ func displayCursor(cursor *mgo.Query) error {
 	}
 	err := iter.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	if len(words) > 65 {
 		words = words[:65] + "..."
@@ -49,14 +52,14 @@ func displayDoc(doc bson.M) error {
 	fmt.Printf("%v\n", doc)
 	jsonString, err := json.MarshalIndent(doc, "", " ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Println("\nResult as JSON:")
 
 	var out bytes.Buffer
 	err = json.Indent(&out, jsonString, "", "  ")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	var st string = out.String()
@@ -80,12 +83,12 @@ func showNewDocs(collection *mgo.Collection) error {
 		err := displayDoc(doc)
 		if err != nil {
 			iter.Close()
-			return err
+			return errors.Wrap(err, "")
 		}
 	}
 	err := iter.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("Showing structure of document for word 'the' written by javascript to check that the ones written by this go program are the same ...\n")
 	fmt.Printf("You need to do a visual check / comparison !\n")
@@ -97,12 +100,12 @@ func showNewDocs(collection *mgo.Collection) error {
 		err := displayDoc(doc)
 		if err != nil {
 			iter.Close()
-			return err
+			return errors.Wrap(err, "")
 		}
 	}
 	err = iter.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	return findSpecificWords(collection) // added to just show the word of interest
@@ -117,7 +120,7 @@ func (m *Mongo) addSelfie() error {
 	fmt.Printf("\nBefore Inserting:\n")
 	err := showNewDocs(collection)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 
 	var letters = []string{"s", "e", "l", "f", "i"}
@@ -137,7 +140,7 @@ func (m *Mongo) addSelfie() error {
 	fmt.Printf("About to insert ...\n")
 	err = collection.Insert(selfie)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("After Inserting One:\n")
 	return showNewDocs(collection)
@@ -184,11 +187,11 @@ func (m *Mongo) addGoogleAndTweet() error {
 	// Add multiple documents 'ONE' at a time as 'mgo' lib only does one at a time ...
 	err := collection.Insert(gogle)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	err = collection.Insert(tweet)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("After Inserting Multiple:\n")
 	return showNewDocs(collection)
@@ -234,7 +237,7 @@ func (m *Mongo) addJimmmyViaStruct() error { // thats 3 m's in Jimmmy, to ensure
 	fmt.Printf("About to insert 'jimmmy' via 'go' structure ...\n")
 	err := collection.Insert(jimmmy)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
 	fmt.Printf("After Inserting 'jimmmy':\n")
 	return showNewDocs(collection)
@@ -242,24 +245,29 @@ func (m *Mongo) addJimmmyViaStruct() error { // thats 3 m's in Jimmmy, to ensure
 
 func main() {
 	mongodb, err := GetMongoDB()
-	check(err)
+	if err != nil {
+		errString := fmt.Sprintf("%v", err)
+		log.Fatal().Err(errors.New(errString)).Str("", "").Msgf("Database problem")
+		// log.Fatal() above exits the program
+	}
+
 	defer mongodb.Session.Close()
 
 	err = mongodb.addSelfie()
 	if err != nil {
-		log.Println(err)
-		return
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
+		return // do this so that 'defer' gets done
 	}
 
 	err = mongodb.addGoogleAndTweet()
 	if err != nil {
-		log.Println(err)
-		return
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
+		return // do this so that 'defer' gets done
 	}
 
 	err = mongodb.addJimmmyViaStruct()
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
 	}
 }
 
@@ -286,6 +294,7 @@ func GetMongoDB() (*Mongo, error) {
 
 	session, err := mongodb.init()
 	if err != nil {
+		// no session to close
 		log.Printf("failed to initialise mongo %v", err)
 		return nil, err
 	}
@@ -293,6 +302,7 @@ func GetMongoDB() (*Mongo, error) {
 
 	names, err := session.DB(mongodb.Database).CollectionNames()
 	if err != nil {
+		session.Close()
 		log.Printf("Failed to get collection names: %v", err)
 		return nil, err
 	}
@@ -306,6 +316,7 @@ func GetMongoDB() (*Mongo, error) {
 		}
 	}
 	if found == false {
+		session.Close()
 		log.Printf("Can NOT find collection: %v, in Database: %v", mongodb.Collection, mongodb.Database)
 		return nil, errors.New("Collection missing")
 	}
