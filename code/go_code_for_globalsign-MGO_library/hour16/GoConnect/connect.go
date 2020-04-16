@@ -30,7 +30,7 @@ func (m *Mongo) Ping() error {
 	mutex.Lock()
 	if pingInFlight == true {
 		mutex.Unlock()
-		return nil
+		return nil // reject re-entrant calls (should this function get called from different go routines)
 	}
 	pingInFlight = true
 	mutex.Unlock()
