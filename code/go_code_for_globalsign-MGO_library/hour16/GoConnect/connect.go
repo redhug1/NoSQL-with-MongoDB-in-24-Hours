@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
 	mgo "github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
@@ -16,6 +18,55 @@ import (
 func init() {
 	zerolog.SetGlobalLevel(zerolog.TraceLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+}
+
+var pingInFlight bool = false
+
+// Ping the mongodb database (and only call from ONE go routine !)
+func (m *Mongo) Ping() error {
+	if pingInFlight == true {
+		return nil
+	}
+	pingInFlight = true
+
+	s := m.Session.Copy()
+	defer func() {
+		pingInFlight = false
+		s.Close()
+	}()
+
+	pingDoneChan := make(chan error)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		log.Printf("db ping")
+		start := time.Now()
+		// NOTE: if at this point the mongodb stops / stops responding ...
+		// the following Ping will timeout after ~50 seconds and
+		// return "no reachable servers" as the error string.
+		err := s.Ping()
+		log.Printf("Ping took : %s", time.Since(start))
+		if err != nil {
+			log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("Ping mongo")
+		} else {
+			log.Printf("ping OK")
+		}
+		pingDoneChan <- err
+		wg.Done()
+	}()
+
+	go func() {
+		wg.Wait()
+		close(pingDoneChan)
+	}()
+
+	var result error
+	select {
+	case err := <-pingDoneChan:
+		result = err
+	}
+	return result
 }
 
 func main() {
@@ -37,6 +88,7 @@ func main() {
 	}
 
 	fmt.Println("Number of Documents:", count)
+	mongodb.Ping()
 }
 
 // The following code is suitable for putting in its own file ...
