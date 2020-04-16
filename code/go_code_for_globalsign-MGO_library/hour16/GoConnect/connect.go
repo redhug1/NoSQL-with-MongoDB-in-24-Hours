@@ -20,19 +20,27 @@ func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
 
-var pingInFlight bool = false
+var (
+	mutex        sync.Mutex
+	pingInFlight bool = false
+)
 
-// Ping the mongodb database (and only call from ONE go routine !)
+// Ping the mongodb database
 func (m *Mongo) Ping() error {
+	mutex.Lock()
 	if pingInFlight == true {
+		mutex.Unlock()
 		return nil
 	}
 	pingInFlight = true
+	mutex.Unlock()
 
 	s := m.Session.Copy()
 	defer func() {
-		pingInFlight = false
 		s.Close()
+		mutex.Lock()
+		pingInFlight = false
+		mutex.Unlock()
 	}()
 
 	pingDoneChan := make(chan error)
