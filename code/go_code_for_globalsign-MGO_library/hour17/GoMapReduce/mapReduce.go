@@ -93,30 +93,37 @@ func (m *Mongo) totalVowelBeginningCertainLetter() error {
 
 	collection := s.DB(m.Database).C(m.Collection)
 
-	/* NOTE: this commented out code, as far as any documentation goes, should work ... but does NOT ...
 	var alphabet = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
+
+	// ======================================================================================================
+	// NOTE: this code the uses MapReduce, as far as any documentation goes, should work ... but does NOT ...
+
 	var result []struct {
-		Id    int "_id"
+		Id    int "_id" // NOTE: this does not get filled properly !
 		Value float64
 	}
 
 	job := &mgo.MapReduce{
 		Map:    "function() { emit(this.first, this.stats.vowels); }",
 		Reduce: "function(key, values) { return Array.sum(values); }",
-		Out:    "results_collection",
+		//Out:    "results_collection",
 	}
 
 	query := bson.M{"first": bson.M{"$in": alphabet}}
 
-	_, err := collection.Find(query).MapReduce(job, &result)	// !!! this fails
-	check(err)
-	print("\n\nTotal vowel count in words beginning with a certain letter:")
-	for _, item := range result {
-		fmt.Println(item.Value)
+	_, err := collection.Find(query).MapReduce(job, &result)
+	if err != nil {
+		return errors.Wrap(err, "")
 	}
-	*/
-	/* NOTE: So, we do it a different way ... */
-	var alphabet = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
+	fmt.Printf("\n\nTotal vowel count in words beginning with a certain letter:\n")
+	for i, item := range result {
+		fmt.Printf("%T, %v", item, item)
+		fmt.Printf("    %s : %v\n", alphabet[i], item.Value)
+	}
+
+	// ======================================
+	// NOTE: So, we do it a different way ...
+
 	pipeline := []bson.M{
 		bson.M{"$match": bson.M{"first": bson.M{"$in": alphabet}}},
 		bson.M{"$group": bson.M{"_id": "$first",
@@ -138,7 +145,36 @@ func (m *Mongo) moreComplexMapReduce(session *mgo.Session) error {
 	var alphabet = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
 	var vowels = []string{"a", "e", "i", "o", "u"}
 
-	query := bson.M{"$and": []bson.M{
+	// ======================================================================================================
+	// NOTE: this code the uses MapReduce, as far as any documentation goes, should work ... but does NOT ...
+
+	var result []struct {
+		Id    int "_id"
+		Value float64
+	}
+
+	job := &mgo.MapReduce{
+		Map:    "function() { emit(this.first, { vowels: this.stats.vowels, consonants: this.stats.consonants} ); }",
+		Reduce: "function(key, values) { result = {count: values.length, vowels: 0, consonants: 0}; for(var i=0; i<values.length; i++){ if (values[i].vowels) result.vowels += values[i].vowels; if (values[i].consonants) result.consonants += values[i].consonants; } return result; }",
+		//		Out:    "results_collection",
+		Finalize: "function(key, obj) { obj.characters = obj.vowels + obj.consonants; return obj; }",
+	}
+
+	query := bson.M{"last": bson.M{"$in": vowels}}
+
+	_, err := collection.Find(query).MapReduce(job, &result)
+	if err != nil {
+		return errors.Wrap(err, "")
+	}
+	fmt.Printf("\nTotal words, vowels, consonants and characters in words beginning with a certain letter that ends with a vowel:\n")
+	for _, item := range result {
+		fmt.Printf("%T, %v, %v\n", item, item, item.Value)
+	}
+
+	// ======================================
+	// NOTE: So, we do it a different way ...
+
+	query = bson.M{"$and": []bson.M{
 		bson.M{"last": bson.M{"$in": vowels}},
 		bson.M{"first": bson.M{"$in": alphabet}},
 	}}
@@ -159,7 +195,7 @@ func (m *Mongo) moreComplexMapReduce(session *mgo.Session) error {
 			return errors.Wrap(err, "")
 		}
 	}
-	err := iter.Close()
+	err = iter.Close()
 	if err != nil {
 		return errors.Wrap(err, "")
 	}
@@ -205,6 +241,7 @@ func main() {
 
 	err = mongodb.totalVowelBeginningCertainLetter()
 	if err != nil {
+		log.Printf("%+v", err)
 		log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("")
 		return // do this so that 'defer' gets done
 	}
