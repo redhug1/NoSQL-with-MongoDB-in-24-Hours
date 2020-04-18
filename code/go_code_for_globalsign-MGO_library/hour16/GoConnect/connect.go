@@ -45,6 +45,7 @@ func (m *Mongo) Ping(ctx context.Context) (time.Time, error) {
 	s := m.Session.Copy()
 	defer func() {
 		s.Close()
+		mutex.Lock()
 		pingInFlight = false
 		mutex.Unlock()
 		fmt.Printf("ping defer\n")
@@ -87,9 +88,11 @@ func (m *Mongo) Ping(ctx context.Context) (time.Time, error) {
 	case err := <-pingDoneChan:
 		mutex.Lock()
 		m.lastPingResult = err
+		mutex.Unlock()
 	case <-ctx.Done():
 		mutex.Lock()
 		m.lastPingResult = ctx.Err()
+		mutex.Unlock()
 	}
 	return m.lastPingTime, m.lastPingResult
 }
