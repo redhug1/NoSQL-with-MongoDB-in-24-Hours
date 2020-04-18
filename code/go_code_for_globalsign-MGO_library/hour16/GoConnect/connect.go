@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -26,11 +27,17 @@ var (
 )
 
 // Ping the mongodb database
-func (m *Mongo) Ping() error {
+func (m *Mongo) Ping(ctx context.Context) (time.Time, error) {
 	mutex.Lock()
-	if pingInFlight == true {
+	if (pingInFlight == true) || (time.Since(m.lastPingTime) < 1*time.Second) {
+		if pingInFlight == true {
+			fmt.Printf("reject, as Ping is in Flight\n")
+		}
+		// reject re-entrant calls (should this function get called from different go routines)
+		lpt := m.lastPingTime // protect from race
+		lres := m.lastPingResult
 		mutex.Unlock()
-		return nil // reject re-entrant calls (should this function get called from different go routines)
+		return lpt, lres
 	}
 	pingInFlight = true
 	mutex.Unlock()
@@ -38,27 +45,33 @@ func (m *Mongo) Ping() error {
 	s := m.Session.Copy()
 	defer func() {
 		s.Close()
-		mutex.Lock()
 		pingInFlight = false
 		mutex.Unlock()
+		fmt.Printf("ping defer\n")
 	}()
+
+	mutex.Lock()
+	m.lastPingTime = time.Now()
+	mutex.Unlock()
 
 	pingDoneChan := make(chan error)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
-		log.Printf("db ping")
+		log.Trace().Msg("db ping")
 		start := time.Now()
 		// NOTE: if at this point the mongodb stops / stops responding ...
-		// the following Ping will timeout after ~50 seconds and
+		// (which is entirely possible when mongo db being accessed is
+		//  on another server)
+		// the following Ping will timeout after ~60 seconds and
 		// return "no reachable servers" as the error string.
 		err := s.Ping()
-		log.Printf("Ping took : %s", time.Since(start))
+		log.Trace().Msgf("Ping took : %s", time.Since(start))
 		if err != nil {
 			log.Error().Err(errors.New(fmt.Sprintf("%+v", err))).Msgf("Ping mongo")
 		} else {
-			log.Printf("ping OK")
+			log.Trace().Msg("ping OK")
 		}
 		pingDoneChan <- err
 		wg.Done()
@@ -68,13 +81,17 @@ func (m *Mongo) Ping() error {
 		wg.Wait()
 		close(pingDoneChan)
 	}()
+	fmt.Printf("Ping go returned\n")
 
-	var result error
 	select {
 	case err := <-pingDoneChan:
-		result = err
+		mutex.Lock()
+		m.lastPingResult = err
+	case <-ctx.Done():
+		mutex.Lock()
+		m.lastPingResult = ctx.Err()
 	}
-	return result
+	return m.lastPingTime, m.lastPingResult
 }
 
 func main() {
@@ -96,7 +113,25 @@ func main() {
 	}
 
 	fmt.Println("Number of Documents:", count)
-	mongodb.Ping()
+	ctx, cancelHealthChecks := context.WithCancel(context.Background())
+
+	for i := 0; i < 10000; i++ {
+		go func(num int) {
+			/*ptime, err := */ mongodb.Ping(ctx)
+
+			//sfmt.Printf("%v : Last Ping'd at: %v, %v  :: current time %v\n", num, ptime, err, time.Now())
+		}(i)
+		time.Sleep(150 * time.Microsecond) // NOTE: Adjust this delay to suite your system speed
+		// to small a value and you may not see any Ping results due to all 'go routines' completing within
+		// ONE second ...
+	}
+
+	time.Sleep(3 * time.Second)
+
+	log.Trace().Msg("Canceling healthchecks")
+	cancelHealthChecks()
+	<-ctx.Done()
+	log.Trace().Msg("Canceled healthchecks")
 }
 
 // The following code is suitable for putting in its own file ...
@@ -107,10 +142,12 @@ const (
 )
 
 type Mongo struct {
-	Collection string
-	Database   string
-	Session    *mgo.Session
-	URI        string
+	Collection     string
+	Database       string
+	Session        *mgo.Session
+	URI            string
+	lastPingTime   time.Time
+	lastPingResult error
 }
 
 func GetMongoDB() (*Mongo, error) {
@@ -119,6 +156,9 @@ func GetMongoDB() (*Mongo, error) {
 		Database:   "words",
 		URI:        mongoURI,
 	}
+
+	mongodb.lastPingTime = time.Now()
+	mongodb.lastPingResult = nil
 
 	session, err := mongodb.init()
 	if err != nil {
@@ -159,5 +199,6 @@ func (m *Mongo) init() (session *mgo.Session, err error) {
 
 	//	session.EnsureSafe(&mgo.Safe{WMode: "majority"})
 	//	session.SetMode(mgo.Strong, true)
+
 	return session, nil
 }
