@@ -14,6 +14,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 )
 
 func init() {
@@ -97,6 +99,55 @@ func (m *Mongo) Ping(ctx context.Context) (time.Time, error) {
 	return m.lastPingTime, m.lastPingResult
 }
 
+// =====================================
+
+type HealthCheckClient struct {
+	mongo       *Mongo
+	serviceName string
+}
+
+// NewHealthCheckClient returns a new health check function using the given service
+func NewHealthCheckClient(mongodb *Mongo, ctx context.Context, state *healthcheck.CheckState) func(context.Context, *healthcheck.CheckState) error {
+	var hc HealthCheckClient
+	hc.mongo = mongodb
+	hc.serviceName = "mongodb"
+
+	var count int
+
+	checkFunc := func(ctx context.Context, state *healthcheck.CheckState) error {
+		count++
+		copyCount := count
+		fmt.Printf("About to do Health Check # %v\n", copyCount)
+		hc.mongo.Ping(ctx)
+		time.Sleep(10 * time.Second) // this to simulate 'Ping' taking longer than usual
+		fmt.Printf("Finished Health Check # %v\n", copyCount)
+		//now := time.Now().UTC()
+		//		state.mutex.Lock()
+		//		defer state.mutex.Unlock()
+
+		//		state.lastChecked = &now
+		//		state.lastSuccess = &now
+		return nil
+	}
+	return checkFunc
+}
+
+func generateTestState(msg string) healthcheck.CheckState {
+	//previousTime := time.Unix(0, 0).UTC()
+	//currentTime := previousTime.Add(time.Duration(30) * time.Minute)
+	return healthcheck.CheckState{
+		//		name: "some check",
+		//		status:      StatusOK,
+		//		statusCode:  200,
+		//		message:     msg,
+		//		lastChecked: &previousTime,
+		//		lastSuccess: &previousTime,
+		//		lastFailure: &currentTime,
+	}
+}
+
+// =====================================
+
 func main() {
 	mongodb, err := GetMongoDB()
 	if err != nil {
@@ -135,6 +186,46 @@ func main() {
 	cancelHealthChecks()
 	<-ctx.Done()
 	log.Trace().Msg("Canceled healthchecks")
+
+	// ============================================================================
+	// The following is a bit of a hack to integrate Ping() into ONSdigital latest
+	// dp-healthcheck library to test changes to ticker.go
+
+	const (
+		criticalTimeout = 15 * time.Second
+		interval        = 1010 * time.Millisecond // delivers ~ 19 in 20 seconds
+	)
+
+	var version = healthcheck.VersionInfo{
+		BuildTime:       time.Unix(0, 0),
+		GitCommit:       "d6cd1e2bd19e03a81132a23b2025920577f84e37",
+		Language:        "go",
+		LanguageVersion: "1.14.1",
+		Version:         "1.0.0",
+	}
+
+	ctx, cancelHealthChecks = context.WithCancel(context.Background())
+
+	state := generateTestState("ping hc") // !!! this needs doing better
+
+	// !!! this to go into 'mongo' code ...
+	checkFunc := NewHealthCheckClient(mongodb, ctx, &state)
+
+	hc := healthcheck.New(version, criticalTimeout, interval)
+	err = hc.AddCheck("check 1", checkFunc)
+	hc.Start(ctx)
+
+	// let healthchecks run for 20 seconds
+	time.Sleep(20 * time.Second)
+
+	fmt.Printf("Telling Health Checks to STOP\n")
+	hc.Stop()
+
+	log.Trace().Msg("Canceling healthchecks")
+	cancelHealthChecks()
+	<-ctx.Done()
+	log.Trace().Msg("Canceled healthchecks")
+
 }
 
 // The following code is suitable for putting in its own file ...
@@ -153,6 +244,7 @@ type Mongo struct {
 	lastPingResult error
 }
 
+// GetMongoDB - Do init and check required collection exists
 func GetMongoDB() (*Mongo, error) {
 	mongodb := &Mongo{
 		Collection: "word_stats",
